@@ -6,6 +6,10 @@ import "balancer-v2-monorepo/pkg/interfaces/contracts/vault/IFlashLoanRecipient.
 import {ISwapRouter} from "./interfaces/ISwapRouter.sol";
 import {IAave} from "./interfaces/IAave.sol";
 
+/**
+ * @title A contract for creating an ETH staking leveraged position
+ * @notice This contract allows a user to maximize the earning from ETH staking by creating a leveraged position of lido wstETH using AAVE.
+ */
 contract stETHLeverage is IFlashLoanRecipient {
     IAave immutable aaveV3Pool;
     address immutable vWeth;
@@ -43,6 +47,11 @@ contract stETHLeverage is IFlashLoanRecipient {
         owner = msg.sender;
     }
 
+    /**
+     * @dev The strategy works by requesting a flashloan of WETH from balancer, exchaging for lido wstETH which is deposited into AAVE.
+     * This AAVE position is then used as collateral to borrow WETH which is then used to repay the flashloan.
+     * @param loanAmount the amount of flashloan to request.
+     */
     function openPosition(uint256 loanAmount) external payable OnlyOwner {
         IERC20[] memory tokens = new IERC20[](1);
         uint256[] memory amounts = new uint256[](1);
@@ -52,6 +61,11 @@ contract stETHLeverage is IFlashLoanRecipient {
         IVault(balancer).flashLoan(this, tokens, amounts, userData);
     }
 
+    /**
+     * @dev To close the position, the user requests a WETH flashloan from Balancer which is used to repay the debt on AAVE.
+     * Then we withdraw the wstETH from AAVE and swap it for WETH on UniSwapV3. The WETH is used to repay the flashloan and the profit is sent to the user.
+     * @param minWethOut The minimum WETH amount to receive from the UniswapV3 swap.
+     */
     function closePosition(uint256 minWethOut) external OnlyOwner {
         uint256 currentDebt = IERC20(vWeth).balanceOf(address(this));
         IERC20[] memory tokens = new IERC20[](1);
