@@ -1,66 +1,29 @@
-## Foundry
+## stETHLeverage
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+This repo contains a smart contract that lets the user create a leveraged position on ETH staking.
 
-Foundry consists of:
+The contract is based on the approch described in [0Kage Diaries Chapter 2 — Affine](https://medium.com/@0kage/hack-series-deep-dive-chapter-2-affine-da2d7b0bbefd).
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+The strategy works by requesting a flashloan of WETH from [balancer](https://balancer.fi/), exchaging for [lido](https://lido.fi/) wstETH which is deposited into [AAVE](https://aave.com/). This AAVE position is then used as collateral to borrow WETH which is then used to repay the flashloan. 
+With this we create a leveraged position on ETH staking that is more profitable than simplying holding wstETH, as long as the interest rate of AAVE remains lower than ETH staking rewards.
 
-## Documentation
+To close the position, the user requests a WETH flashloan from Balancer which is used to repay the debt on AAVE. Then we withdraw the wstETH from AAVE and swap it for WETH on UniSwapV3. The WETH is used to repay the flashloan and the profit is sent to the user.
 
-https://book.getfoundry.sh/
+### Usage
 
-## Usage
+To install all dependencies and build the project run
+``` 
+make
+``` 
 
-### Build
-
-```shell
-$ forge build
+To run tests create a `.env` file and insert a Ethereum mainnet RPC API key, in the following fashion:
+```
+MAINNET_RPC_URL="<YOUR_API_KEY>"
+```
+And then run 
+``` 
+forge test
 ```
 
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+### DISCLAIMER
+**This contract has not been audited and should not be used in production. This is a an example of how a staking leveraged position can be created**
