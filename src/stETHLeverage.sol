@@ -8,10 +8,10 @@ import {IAave} from "./interfaces/IAave.sol";
 
 contract stETHLeverage is IFlashLoanRecipient {
     IAave immutable aaveV3Pool;
+    address immutable vWeth;
     address immutable balancer;
     address immutable wstETH;
     address immutable weth;
-    address immutable vWeth;
     ISwapRouter immutable swapRouter;
     address immutable owner;
 
@@ -70,11 +70,11 @@ contract stETHLeverage is IFlashLoanRecipient {
             revert stETHLeverage__OnlyBalancer(balancer, msg.sender);
         }
         uint256 minWethOut = abi.decode(userData, (uint256));
-        if (minWethOut == 0) _openPoisitionCallBack(amounts[0]);
+        if (minWethOut == 0) _openPositionCallBack(amounts[0]);
         else _closePositionCallback(amounts[0], minWethOut);
     }
 
-    function _openPoisitionCallBack(uint256 amount) internal {
+    function _openPositionCallBack(uint256 amount) internal {
         //turn weth to eth
         IWETH(weth).withdraw(amount);
 
@@ -85,7 +85,7 @@ contract stETHLeverage is IFlashLoanRecipient {
         }
         uint256 wstETHBalance = IERC20(wstETH).balanceOf(address(this));
 
-        //aaveV3Pool.setUserEMode()
+        aaveV3Pool.setUserEMode(1);
         //Supply wstETH to AAVE
         IERC20(wstETH).approve(address(aaveV3Pool), wstETHBalance);
         aaveV3Pool.supply(wstETH, wstETHBalance, address(this), 0);
@@ -117,8 +117,14 @@ contract stETHLeverage is IFlashLoanRecipient {
             sqrtPriceLimitX96: 0
         });
         uint256 amountOut = swapRouter.exactInputSingle(params);
-        //repay balancer
+        //Repay flashLoan
         IERC20(weth).transfer(balancer, amount);
+        //send funds to owner
+        IWETH(weth).withdraw(amountOut - amount);
+        (bool success, bytes memory returnData) = payable(owner).call{value: amountOut - amount}("");
+        if (!success) {
+            revert stETHLeverage__CallFailed(returnData);
+        }
     }
 
     receive() external payable {}
